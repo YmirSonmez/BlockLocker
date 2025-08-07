@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -59,6 +60,9 @@ public final class BlockPlaceListener extends EventListener {
      */
     @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
     public void onBlockPlace(BlockPlaceEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         Player player = event.getPlayer();
 
         Optional<Protection> interferingProtection = willInterfereWith(player, event.getBlockPlaced());

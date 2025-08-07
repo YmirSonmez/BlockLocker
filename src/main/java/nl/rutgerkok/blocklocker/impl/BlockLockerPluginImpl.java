@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
+import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.Configuration;
@@ -180,6 +181,8 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
         if (TownyLocationChecker.isAvailable()) {
             this.combinedLocationChecker.addChecker(new TownyLocationChecker());
         }
+        this.combinedLocationChecker.addChecker(new WorldLocationChecker(config.getWhitelistedWorlds()));
+
     }
 
     private void loadServices() {

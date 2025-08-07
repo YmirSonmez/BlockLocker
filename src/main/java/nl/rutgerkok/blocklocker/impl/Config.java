@@ -1,14 +1,6 @@
 package nl.rutgerkok.blocklocker.impl;
 
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Logger;
 
 import org.bukkit.Material;
@@ -31,7 +23,9 @@ final class Config {
                 UPDATER = "updater",
                 CONNECT_CONTAINERS = "connectContainers",
                 AUTO_EXPIRE_DAYS = "autoExpireDays",
-                ALLOW_DESTROY_BY = "allowDestroyBy";
+                ALLOW_DESTROY_BY = "allowDestroyBy",
+                WHITELISTED_WORLDS = "whitelistWorlds";
+
     }
 
     static final String DEFAULT_TRANSLATIONS_FILE = "translations-en.yml";
@@ -48,6 +42,8 @@ final class Config {
      */
     private final Set<Material> protectableMaterialsSet;
     private final UpdatePreference updatePreference;
+
+    private final List<String> whitelistedWorlds;
 
     Config(Logger logger, FileConfiguration config) {
         this.logger = logger;
@@ -76,6 +72,12 @@ final class Config {
         protectableMaterialsSet = new HashSet<>();
         for (Set<Material> protectableByType : protectableMaterialsMap.values()) {
             protectableMaterialsSet.addAll(protectableByType);
+        }
+
+        if (config.contains(Key.WHITELISTED_WORLDS)) {
+            whitelistedWorlds = config.getStringList(Key.WHITELISTED_WORLDS);
+        } else {
+            whitelistedWorlds = new ArrayList<>();
         }
     }
 
@@ -159,6 +161,10 @@ final class Config {
      */
     String getLanguageFileName() {
         return languageFile;
+    }
+
+    List<String> getWhitelistedWorlds() {
+        return whitelistedWorlds;
     }
 
     /**

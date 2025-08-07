@@ -5,6 +5,7 @@ import nl.rutgerkok.blocklocker.Permissions;
 import nl.rutgerkok.blocklocker.ProtectionSign;
 import nl.rutgerkok.blocklocker.Translator.Translation;
 import nl.rutgerkok.blocklocker.impl.BlockLockerPluginImpl;
+import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
 import nl.rutgerkok.blocklocker.profile.Profile;
 import nl.rutgerkok.blocklocker.protection.Protection;
 import org.bukkit.Material;
@@ -67,6 +68,10 @@ public class BlockDestroyListener extends EventListener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(block.getWorld().getName())) {
+            return;
+        }
+
         Optional<Protection> protection = plugin.getProtectionFinder().findProtection(block);
         if (!protection.isPresent()) {
             return;
@@ -75,10 +80,10 @@ public class BlockDestroyListener extends EventListener {
         Player player = event.getPlayer();
         Profile profile = plugin.getProfileFactory().fromPlayer(player);
         if (!protection.get().isOwner(profile)) {
-            if (player.hasPermission(Permissions.CAN_ADMIN)) {
+             if (player.hasPermission(Permissions.CAN_ADMIN)) {
                 String ownerName = protection.get().getOwnerDisplayName();
                 plugin.getTranslator().sendMessage(player, Translation.PROTECTION_BYPASSED, ownerName);
-            } else if (isExpired(protection.get())){
+            } else if (isExpired(protection.get())) {
                 plugin.getTranslator().sendMessage(player, Translation.PROTECTION_EXPIRED);
             } else {
                 event.setCancelled(true);
@@ -94,6 +99,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockBurnEvent(BlockBurnEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         if (plugin.getChestSettings().allowDestroyBy(AttackType.FIRE)) {
             return;
         }
@@ -104,12 +112,15 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockExplodeEvent(BlockExplodeEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         // Generally caused by a Bed, but when the event is triggered the bed is no longer there so we can't check that
         AttackType attackType = AttackType.BLOCK_EXPLOSION;
         if (plugin.getChestSettings().allowDestroyBy(attackType)) {
             return;
         }
-        for (Iterator<Block> it = event.blockList().iterator(); it.hasNext();) {
+        for (Iterator<Block> it = event.blockList().iterator(); it.hasNext(); ) {
             Block block = it.next();
             if (isProtected(block)) {
                 it.remove();
@@ -119,6 +130,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockPistonExtend(BlockPistonExtendEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         if (plugin.getChestSettings().allowDestroyBy(AttackType.PISTON)) {
             return;
         }
@@ -129,6 +143,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockPistonRetract(BlockPistonRetractEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         if (plugin.getChestSettings().allowDestroyBy(AttackType.PISTON)) {
             return;
         }
@@ -139,6 +156,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         AttackType attackType = AttackType.UNKNOWN;
         if (event instanceof EntityBreakDoorEvent) {
             attackType = AttackType.ZOMBIE;
@@ -155,6 +175,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityExplodeEvent(EntityExplodeEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getEntity().getWorld().getName())) {
+            return;
+        }
         AttackType attackType = AttackType.UNKNOWN;
         Entity attacker = event.getEntity();
         if (attacker instanceof TNTPrimed) {
@@ -169,7 +192,7 @@ public class BlockDestroyListener extends EventListener {
         if (plugin.getChestSettings().allowDestroyBy(attackType)) {
             return;
         }
-        for (Iterator<Block> it = event.blockList().iterator(); it.hasNext();) {
+        for (Iterator<Block> it = event.blockList().iterator(); it.hasNext(); ) {
             Block block = it.next();
             if (isProtected(block)) {
                 it.remove();
@@ -179,6 +202,9 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler
     public void onRedstone(BlockRedstoneEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         if (event.getNewCurrent() == event.getOldCurrent()) {
             return;
         }
@@ -190,12 +216,15 @@ public class BlockDestroyListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onStructureGrow(StructureGrowEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getWorld().getName())) {
+            return;
+        }
         if (plugin.getChestSettings().allowDestroyBy(AttackType.SAPLING)) {
             return;
         }
         // Check deleted blocks
         List<BlockState> blocks = event.getBlocks();
-        for (Iterator<BlockState> it = blocks.iterator(); it.hasNext();) {
+        for (Iterator<BlockState> it = blocks.iterator(); it.hasNext(); ) {
             BlockState blockState = it.next();
 
             if (blockState.getType() == Material.AIR) {

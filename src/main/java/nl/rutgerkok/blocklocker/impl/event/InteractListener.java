@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import nl.rutgerkok.blocklocker.*;
+import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -91,6 +92,15 @@ public final class InteractListener extends EventListener {
     private boolean checkAllowed(Player player, Protection protection, boolean clickedSign) {
         PlayerProfile playerProfile = plugin.getProfileFactory().fromPlayer(player);
         boolean allowed = protection.isAllowed(playerProfile);
+
+        if (WorldLocationChecker.instance != null && !WorldLocationChecker.isAvailable()) {
+            Block block = protection.getSomeProtectedBlock();
+            if (block != null) {
+                if (!WorldLocationChecker.isWorldAllowedWhiteList(block.getWorld().getName())) {
+                    allowed = true;
+                }
+            }
+        }
 
         // Check for expired protection
         if (!allowed && isExpired(protection)) {
@@ -246,6 +256,9 @@ public final class InteractListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityInteract(EntityInteractEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getEntity().getWorld().getName())) {
+            return;
+        }
         // Prevents villagers from opening doors
         if (!(event.getEntity() instanceof Villager)) {
             return;
@@ -260,6 +273,13 @@ public final class InteractListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onInventoryMoveItemEvent(InventoryMoveItemEvent event) {
+        try {
+            if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getSource().getLocation().getWorld().getName())) {
+                return;
+            }
+        } catch (NoSuchFieldError ignored) {
+        }
+
         Block from = getInventoryBlockOrNull(event.getSource());
         if (from != null) {
             if (isRedstoneDenied(from)) {
@@ -283,6 +303,9 @@ public final class InteractListener extends EventListener {
      */
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getPlayer().getWorld().getName())) {
+            return;
+        }
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
             return;
         }

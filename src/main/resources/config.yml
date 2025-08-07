@@ -186,3 +186,6 @@ autoExpireDays: 0
 # ZOMBIE - zombies can destroy protected doors
 # UNKNOWN - special value for all other unrecognized attacks
 allowDestroyBy: []
+
+whitelistWorlds:
+- world

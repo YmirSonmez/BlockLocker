@@ -3,6 +3,7 @@ package nl.rutgerkok.blocklocker.impl.event;
 
 import java.util.Optional;
 
+import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
 import org.bukkit.ChatColor;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -157,6 +158,9 @@ public class SignChangeListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onSignChange(SignChangeEvent event) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getBlock().getWorld().getName())) {
+            return;
+        }
         Optional<Protection> protection = plugin.getProtectionFinder().findExistingProtectionForNewSign(event.getBlock());
 
         if (protection.isPresent()) {
