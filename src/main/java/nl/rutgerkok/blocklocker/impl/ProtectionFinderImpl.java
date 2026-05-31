@@ -87,9 +87,14 @@ class ProtectionFinderImpl implements ProtectionFinder {
      * @return The protection block, if any.
      */
     private Optional<Block> findProtectableForSupportingBlock(Block supportingBlock) {
-        // Search around that block for doors and attachables
         for (BlockFace doorFace : BlockFinder.NORTH_EAST_SOUTH_WEST_UP_DOWN) {
             Block blockUpDown = supportingBlock.getRelative(doorFace);
+
+            if (!blockUpDown.getWorld().isChunkLoaded(
+                    blockUpDown.getX() >> 4, blockUpDown.getZ() >> 4)) {
+                continue;
+            }
+
             if (settings.canProtect(ProtectionType.DOOR, blockUpDown)) {
                 return Optional.of(blockUpDown);
             }
