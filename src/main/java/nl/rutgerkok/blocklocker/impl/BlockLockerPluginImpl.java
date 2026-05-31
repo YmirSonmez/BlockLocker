@@ -28,7 +28,6 @@ import com.google.common.base.Preconditions;
 
 import nl.rutgerkok.blocklocker.BlockLockerPlugin;
 import nl.rutgerkok.blocklocker.ChestSettings;
-import nl.rutgerkok.blocklocker.HopperCache;
 import nl.rutgerkok.blocklocker.ProfileFactory;
 import nl.rutgerkok.blocklocker.ProtectableBlocksSettings;
 import nl.rutgerkok.blocklocker.ProtectionFinder;

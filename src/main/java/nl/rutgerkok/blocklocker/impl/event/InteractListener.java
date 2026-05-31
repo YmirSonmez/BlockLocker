@@ -1,21 +1,16 @@
 package nl.rutgerkok.blocklocker.impl.event;
 
-import java.util.Optional;
-import java.util.Set;
-
+import com.google.common.collect.ImmutableSet;
 import nl.rutgerkok.blocklocker.*;
+import nl.rutgerkok.blocklocker.Translator.Translation;
+import nl.rutgerkok.blocklocker.event.PlayerProtectionCreateEvent;
+import nl.rutgerkok.blocklocker.impl.BlockLockerPluginImpl;
 import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
-
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.Tag;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.block.BlockState;
-import org.bukkit.block.Lectern;
-import org.bukkit.block.Sign;
+import nl.rutgerkok.blocklocker.location.IllegalLocationException;
+import nl.rutgerkok.blocklocker.profile.PlayerProfile;
+import nl.rutgerkok.blocklocker.profile.Profile;
+import nl.rutgerkok.blocklocker.protection.Protection;
+import nl.rutgerkok.blocklocker.protection.Protection.SoundCondition;
 import org.bukkit.*;
 import org.bukkit.block.*;
 import org.bukkit.block.data.Levelled;
@@ -23,7 +18,10 @@ import org.bukkit.block.data.Waterlogged;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.block.sign.Side;
 import org.bukkit.block.sign.SignSide;
-import org.bukkit.entity.*;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Golem;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -37,16 +35,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
-import com.google.common.collect.ImmutableSet;
-
-import nl.rutgerkok.blocklocker.Translator.Translation;
-import nl.rutgerkok.blocklocker.event.PlayerProtectionCreateEvent;
-import nl.rutgerkok.blocklocker.impl.BlockLockerPluginImpl;
-import nl.rutgerkok.blocklocker.location.IllegalLocationException;
-import nl.rutgerkok.blocklocker.profile.PlayerProfile;
-import nl.rutgerkok.blocklocker.profile.Profile;
-import nl.rutgerkok.blocklocker.protection.Protection;
-import nl.rutgerkok.blocklocker.protection.Protection.SoundCondition;
+import java.util.Optional;
+import java.util.Set;
 
 public final class InteractListener extends EventListener {
 
@@ -282,35 +272,34 @@ public final class InteractListener extends EventListener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityInteract(EntityInteractEvent event) {
-        if (!WorldLocationChecker.isWorldAllowedWhiteList(event.getEntity().getWorld().getName())) {
+        if (!WorldLocationChecker.isWorldAllowedWhiteList(
+                event.getEntity().getWorld().getName())) {
             return;
         }
-        // Prevents villagers from opening doors
-        if (!(event.getEntity() instanceof Villager)) {
-            return;
-        }
-        if (plugin.getChestSettings().allowDestroyBy(AttackType.VILLAGER)) {
-           return;
-        }
-        if (isProtected(event.getBlock())) {
-            event.setCancelled(true);
-        // Prevents villagers and golems from opening doors
+
         Entity entity = event.getEntity();
+
         if (entity instanceof Villager) {
             if (plugin.getChestSettings().allowDestroyBy(AttackType.VILLAGER)) {
                 return;
             }
+
             if (isProtected(event.getBlock())) {
                 event.setCancelled(true);
             }
+
         } else if (entity instanceof Golem) {
             if (plugin.getChestSettings().allowDestroyBy(AttackType.GOLEM)) {
                 return;
             }
-            Optional<Protection> protection = plugin.getProtectionFinder().findProtection(event.getBlock(), SearchMode.MAIN_BLOCKS_ONLY);
+
+            Optional<Protection> protection = plugin.getProtectionFinder()
+                    .findProtection(event.getBlock(), SearchMode.MAIN_BLOCKS_ONLY);
+
             if (protection.isEmpty()) {
                 return;
             }
+
             if (!protection.get().isAllowed(plugin.getProfileFactory().fromGolem())) {
                 event.setCancelled(true);
             }

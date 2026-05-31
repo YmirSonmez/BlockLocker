@@ -34,9 +34,7 @@ final class Config {
                 CONNECT_CONTAINERS = "connectContainers",
                 AUTO_EXPIRE_DAYS = "autoExpireDays",
                 ALLOW_DESTROY_BY = "allowDestroyBy",
-                WHITELISTED_WORLDS = "whitelistWorlds";
-
-                ALLOW_DESTROY_BY = "allowDestroyBy",
+                WHITELISTED_WORLDS = "whitelistWorlds",
                 CONFIG_VERSION = "configVersion";
     }
 
@@ -49,6 +47,8 @@ final class Config {
     private final String languageFile;
     private final Logger logger;
     private final Map<ProtectionType, Set<Material>> protectableMaterialsMap;
+    private final List<String> whitelistedWorlds;
+
     /**
      * Combination of the sets of all individual protection types.
      */
@@ -56,9 +56,27 @@ final class Config {
     private final UpdatePreference updatePreference;
 
     Config(Plugin plugin) {
+        this(plugin.getLogger(), plugin.getConfig());
+
         FileConfiguration config = plugin.getConfig();
-        logger = plugin.getLogger();
-    private final List<String> whitelistedWorlds;
+
+        int version = config.getInt(Key.CONFIG_VERSION, 1);
+        if (version < 2) {
+            logger.info("Upgrading configuration...");
+
+            try (InputStream configStream = Objects.requireNonNull(plugin.getResource("config.yml"))) {
+                FileConfiguration newConfig = YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(configStream, StandardCharsets.UTF_8)
+                );
+
+                writeToConfig(newConfig);
+                newConfig.save(new File(plugin.getDataFolder(), "config.yml"));
+                plugin.reloadConfig();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Failed to read default config", e);
+            }
+        }
+    }
 
     Config(Logger logger, FileConfiguration config) {
         this.logger = logger;
@@ -70,20 +88,28 @@ final class Config {
         autoExpireDays = config.getInt(Key.AUTO_EXPIRE_DAYS);
         allowDestroyBy = readAttackTypeSet(config.getStringList(Key.ALLOW_DESTROY_BY));
 
-        // Materials
         protectableMaterialsMap = new EnumMap<>(ProtectionType.class);
-        protectableMaterialsMap.put(ProtectionType.CONTAINER, readMaterialSet(config.getStringList(Key.PROTECTABLE_CONTAINERS)));
-        protectableMaterialsMap.put(ProtectionType.DOOR, readMaterialSet(config.getStringList(Key.PROTECTABLE_DOORS)));
+        protectableMaterialsMap.put(
+                ProtectionType.CONTAINER,
+                readMaterialSet(config.getStringList(Key.PROTECTABLE_CONTAINERS))
+        );
+        protectableMaterialsMap.put(
+                ProtectionType.DOOR,
+                readMaterialSet(config.getStringList(Key.PROTECTABLE_DOORS))
+        );
+
         if (config.contains(Key.PROTECTABLE_TRAP_DOORS)) {
-            // Still support old name:
-            protectableMaterialsMap.put(ProtectionType.ATTACHABLE,
-                    readMaterialSet(config.getStringList(Key.PROTECTABLE_TRAP_DOORS)));
+            protectableMaterialsMap.put(
+                    ProtectionType.ATTACHABLE,
+                    readMaterialSet(config.getStringList(Key.PROTECTABLE_TRAP_DOORS))
+            );
         } else {
-            protectableMaterialsMap.put(ProtectionType.ATTACHABLE,
-                    readMaterialSet(config.getStringList(Key.PROTECTABLE_ATTACHABLES)));
+            protectableMaterialsMap.put(
+                    ProtectionType.ATTACHABLE,
+                    readMaterialSet(config.getStringList(Key.PROTECTABLE_ATTACHABLES))
+            );
         }
 
-        // Create combined set
         protectableMaterialsSet = new HashSet<>();
         for (Set<Material> protectableByType : protectableMaterialsMap.values()) {
             protectableMaterialsSet.addAll(protectableByType);
@@ -94,23 +120,7 @@ final class Config {
         } else {
             whitelistedWorlds = new ArrayList<>();
         }
-
-        // Config upgrades
-        int version = config.getInt(Key.CONFIG_VERSION, 1);
-        if (version < 2) {
-            logger.info("Upgrading configuration...");
-            // We load the default configuration, apply our settings, and then save it
-            try (InputStream configStream = Objects.requireNonNull(plugin.getResource("config.yml"))) {
-                config = YamlConfiguration.loadConfiguration(new InputStreamReader(configStream, StandardCharsets.UTF_8));
-                writeToConfig(config);
-                config.save(new File(plugin.getDataFolder(), "config.yml"));
-                plugin.reloadConfig();
-            } catch (IOException e) {
-                logger.log(Level.SEVERE, "Failed to read default config", e);
-            }
-        }
     }
-
     /**
      * Writes out all the current settings to a configuration.
      * @param config The config to write to.
