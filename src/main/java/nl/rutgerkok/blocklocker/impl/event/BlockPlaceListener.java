@@ -64,7 +64,7 @@ public final class BlockPlaceListener extends EventListener {
             return;
         }
         Player player = event.getPlayer();
-
+        
         Optional<Protection> interferingProtection = willInterfereWith(player, event.getBlockPlaced());
         if (interferingProtection.isPresent()) {
             // Not allowed to place a block here, would interfere with an existing

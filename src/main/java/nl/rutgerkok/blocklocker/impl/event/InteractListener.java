@@ -5,6 +5,7 @@ import java.util.Set;
 
 import nl.rutgerkok.blocklocker.*;
 import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
+
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -13,14 +14,16 @@ import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Lectern;
 import org.bukkit.block.Sign;
+import org.bukkit.*;
+import org.bukkit.block.*;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.block.sign.Side;
 import org.bukkit.block.sign.SignSide;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Villager;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -28,6 +31,7 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.entity.EntityInteractEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerTakeLecternBookEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -89,7 +93,10 @@ public final class InteractListener extends EventListener {
         };
     }
 
-    private boolean checkAllowed(Player player, Protection protection, boolean clickedSign) {
+    private boolean isLecternOccupied(Lectern lectern) {
+            return ((lectern.getInventory().contains(Material.WRITABLE_BOOK)) || (lectern.getInventory().contains(Material.WRITTEN_BOOK)));
+    }
+    private boolean checkAllowed(Player player, Protection protection, boolean clickedSign, Block container) {
         PlayerProfile playerProfile = plugin.getProfileFactory().fromPlayer(player);
         boolean allowed = protection.isAllowed(playerProfile);
 
@@ -113,6 +120,11 @@ public final class InteractListener extends EventListener {
             allowed = true;
             if (!clickedSign) {
                 // Only show message about bypass when not clicking a sign
+                if (container.getType() == Material.LECTERN) {
+                    if (isLecternOccupied((Lectern) container.getState())) {
+                        return allowed;
+                    }
+                }
                 String ownerName = protection.getOwnerDisplayName();
                 plugin.getTranslator().sendMessage(player, Translation.PROTECTION_BYPASSED, ownerName);
             }
@@ -213,6 +225,21 @@ public final class InteractListener extends EventListener {
 
     private void handleDisallowed(PlayerInteractEvent event, Protection protection, boolean clickedSign,
             boolean usedOffHand) {
+        Block clickedBlock = event.getClickedBlock();
+        Player player = event.getPlayer();
+        Material heldBlock = player.getInventory().getItemInMainHand().getType();
+
+        // Handle lectern logic, especially if there is no book inserted.
+        if (clickedBlock.getType() == Material.LECTERN) {
+            if ((heldBlock != Material.WRITABLE_BOOK) && (heldBlock != Material.WRITTEN_BOOK)) {
+                return;
+            } else {
+                if (isLecternOccupied((Lectern) clickedBlock.getState())) {
+                    return;
+                }
+            }
+        }
+
         event.setCancelled(true);
 
         if (usedOffHand) {
@@ -220,7 +247,6 @@ public final class InteractListener extends EventListener {
             return;
         }
 
-        Player player = event.getPlayer();
         if (clickedSign) {
             plugin.getTranslator()
                     .sendMessage(player, Translation.PROTECTION_IS_CLAIMED_BY, protection.getOwnerDisplayName());
@@ -268,6 +294,26 @@ public final class InteractListener extends EventListener {
         }
         if (isProtected(event.getBlock())) {
             event.setCancelled(true);
+        // Prevents villagers and golems from opening doors
+        Entity entity = event.getEntity();
+        if (entity instanceof Villager) {
+            if (plugin.getChestSettings().allowDestroyBy(AttackType.VILLAGER)) {
+                return;
+            }
+            if (isProtected(event.getBlock())) {
+                event.setCancelled(true);
+            }
+        } else if (entity instanceof Golem) {
+            if (plugin.getChestSettings().allowDestroyBy(AttackType.GOLEM)) {
+                return;
+            }
+            Optional<Protection> protection = plugin.getProtectionFinder().findProtection(event.getBlock(), SearchMode.MAIN_BLOCKS_ONLY);
+            if (protection.isEmpty()) {
+                return;
+            }
+            if (!protection.get().isAllowed(plugin.getProfileFactory().fromGolem())) {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -297,6 +343,38 @@ public final class InteractListener extends EventListener {
     }
 
     /**
+     * Prevents players from taking the book on a protected lectern.
+     *
+     * @param event The event object.
+     */
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerTakeLectern(PlayerTakeLecternBookEvent event) {
+        if (event == null) {
+            return;
+        }
+        Player player = event.getPlayer();
+        Block block = event.getLectern().getBlock();
+        Optional<Protection> protection = plugin.getProtectionFinder().findProtection(block);
+        if (protection.isEmpty()) {
+            return;
+        }
+        boolean allowed = checkAllowed(player, protection.get(), false, block);
+        boolean innerCheck = protection.get().isAllowed(plugin.getProfileFactory().fromPlayer(player));
+
+        if (!allowed) {
+            event.setCancelled(true);
+            plugin.getTranslator().sendMessage(player, Translation.PROTECTION_NO_ACCESS, protection.get().getOwnerDisplayName());
+        } else {
+            if (!innerCheck && player.hasPermission(Permissions.CAN_BYPASS)) {
+                String ownerName = protection.get().getOwnerDisplayName();
+                plugin.getTranslator().sendMessage(player, Translation.PROTECTION_BYPASSED, ownerName);
+            }
+        }
+
+    }
+
+    /**
      * Prevents access to containers.
      *
      * @param event The event object.
@@ -315,6 +393,7 @@ public final class InteractListener extends EventListener {
         if (block == null) {
             return;
         }
+
         Material material = block.getType();
         boolean clickedSign = Tag.STANDING_SIGNS.isTagged(material) || Tag.WALL_SIGNS.isTagged(material);
         // When using the offhand check, access checks must still be performed,
@@ -333,7 +412,7 @@ public final class InteractListener extends EventListener {
         plugin.getProtectionUpdater().update(protection.get(), false);
 
         // Check if player is allowed, open door
-        if (checkAllowed(player, protection.get(), clickedSign)) {
+        if (checkAllowed(player, protection.get(), clickedSign, block)) {
             handleAllowed(event, protection.get(), clickedSign, usedOffHand);
         } else {
             handleDisallowed(event, protection.get(), clickedSign, usedOffHand);
@@ -434,7 +513,6 @@ public final class InteractListener extends EventListener {
             return false;
         }
         Material signMaterial = optionalSignMaterial.get();
-
         if (!plugin.getProtectionFinder().isProtectable(block)) {
             return false;
         }

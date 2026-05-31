@@ -12,6 +12,8 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import nl.rutgerkok.blocklocker.impl.location.WorldLocationChecker;
+import nl.rutgerkok.blocklocker.*;
+import nl.rutgerkok.blocklocker.impl.event.*;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.Configuration;
@@ -66,7 +68,7 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
     private Translator translator;
     private CombinedLocationChecker combinedLocationChecker;
     private SchedulerSupport schedulerSupport;
-    private HopperCache redstoneProtectCache;
+    private ProtectionCache protectionCache;
 
     @Override
     public <E extends Event> E callEvent(E event) {
@@ -86,8 +88,8 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
     }
 
     @Override
-    public HopperCache getHopperCache() {
-        return redstoneProtectCache;
+    public ProtectionCache getProtectionCache() {
+        return protectionCache;
     }
 
     /**
@@ -191,7 +193,7 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
 
         // Configuration
         saveDefaultConfig();
-        config = new Config(getLogger(), getConfig());
+        config = new Config(this);
 
         // Connections with external systems
         loadGroupSystems();
@@ -207,7 +209,7 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
         BlockFinder blockFinder = BlockFinder.create(signParser, config.getConnectContainers());
         protectionFinder = new ProtectionFinderImpl(blockFinder, chestSettings);
         protectionUpdater = new ProtectionUpdaterImpl(getServer(), signParser, profileFactory);
-        redstoneProtectCache = new HopperCacheImpl(this);
+        protectionCache = new HopperCacheImpl();
     }
 
     private Translator loadTranslations(String fileName) {
@@ -253,6 +255,18 @@ public class BlockLockerPluginImpl extends JavaPlugin implements BlockLockerPlug
         plugins.registerEvents(new BlockDestroyListener(this), this);
         plugins.registerEvents(new BlockPlaceListener(this), this);
         plugins.registerEvents(new InteractListener(this), this);
+
+        // Copper golem listener is not available on Spigot & older Minecraft versions
+        try {
+            Class.forName("io.papermc.paper.event.entity.ItemTransportingEntityValidateTargetEvent");
+            plugins.registerEvents(new GolemListener(this), this);
+        } catch (ClassNotFoundException e) {
+            if (!config.allowDestroyBy(AttackType.GOLEM)) {
+                getLogger().warning("Failed to register copper golem listener. Paper 1.21.10+ is required for this" +
+                        " to function. Add GOLEM to allowDestroyBy in the config.yml to disable this warning.");
+            }
+        }
+
         plugins.registerEvents(new SignChangeListener(this), this);
         getCommand(getName().toLowerCase(Locale.ROOT)).setExecutor(new BlockLockerCommand(this));
     }

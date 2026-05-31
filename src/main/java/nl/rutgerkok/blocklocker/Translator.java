@@ -38,6 +38,7 @@ public abstract class Translator {
         TAG_MORE_USERS,
         TAG_PRIVATE,
         TAG_REDSTONE,
+        TAG_GOLEM,
         TAG_TIMER,
         UPDATER_MORE_INFORMATION,
         UPDATER_UNSUPPORTED_SERVER,
@@ -92,17 +93,25 @@ public abstract class Translator {
     public abstract String getWithoutColor(Translation key);
 
     /**
-     * Sends the specified message translated to the given player.
+     * Sends the specified message translated to the given player. In case the translation is blank,
+     * no message will be sent.
      *
      * @param player
      *            The player (or console) to the send the message to.
      * @param translation
      *            The message to send.
      */
-    public abstract void sendMessage(CommandSender player, Translation translation);
+    public final void sendMessage(CommandSender player, Translation translation) {
+        String translated = get(translation);
+        if (translated.isBlank()) {
+            return;
+        }
+        player.sendMessage(translated);
+    }
 
     /**
-     * Sends the specified message translated to the given player.
+     * Sends the specified message translated to the given player. In case the translation is blank,
+     * no message will be sent.
      *
      * @param player
      *            The player (or console) to the send the message to.
@@ -114,6 +123,9 @@ public abstract class Translator {
      */
     public final void sendMessage(CommandSender player, Translation translation, String... parameters) {
         String translated = get(translation);
+        if (translated.isBlank()) {
+            return;
+        }
         for (int i = 0; i < parameters.length; i++) {
             translated = translated.replace("{" + i + "}", parameters[i]);
         }

@@ -1,6 +1,13 @@
 package nl.rutgerkok.blocklocker.impl;
 
 import java.util.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.bukkit.Material;
@@ -10,6 +17,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 import nl.rutgerkok.blocklocker.AttackType;
 import nl.rutgerkok.blocklocker.ProtectionType;
 import nl.rutgerkok.blocklocker.impl.updater.UpdatePreference;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
+import org.jspecify.annotations.Nullable;
 
 final class Config {
 
@@ -26,6 +36,8 @@ final class Config {
                 ALLOW_DESTROY_BY = "allowDestroyBy",
                 WHITELISTED_WORLDS = "whitelistWorlds";
 
+                ALLOW_DESTROY_BY = "allowDestroyBy",
+                CONFIG_VERSION = "configVersion";
     }
 
     static final String DEFAULT_TRANSLATIONS_FILE = "translations-en.yml";
@@ -43,6 +55,9 @@ final class Config {
     private final Set<Material> protectableMaterialsSet;
     private final UpdatePreference updatePreference;
 
+    Config(Plugin plugin) {
+        FileConfiguration config = plugin.getConfig();
+        logger = plugin.getLogger();
     private final List<String> whitelistedWorlds;
 
     Config(Logger logger, FileConfiguration config) {
@@ -79,6 +94,49 @@ final class Config {
         } else {
             whitelistedWorlds = new ArrayList<>();
         }
+
+        // Config upgrades
+        int version = config.getInt(Key.CONFIG_VERSION, 1);
+        if (version < 2) {
+            logger.info("Upgrading configuration...");
+            // We load the default configuration, apply our settings, and then save it
+            try (InputStream configStream = Objects.requireNonNull(plugin.getResource("config.yml"))) {
+                config = YamlConfiguration.loadConfiguration(new InputStreamReader(configStream, StandardCharsets.UTF_8));
+                writeToConfig(config);
+                config.save(new File(plugin.getDataFolder(), "config.yml"));
+                plugin.reloadConfig();
+            } catch (IOException e) {
+                logger.log(Level.SEVERE, "Failed to read default config", e);
+            }
+        }
+    }
+
+    /**
+     * Writes out all the current settings to a configuration.
+     * @param config The config to write to.
+     */
+    private void writeToConfig(FileConfiguration config) {
+        config.set(Key.LANGUAGE_FILE, this.languageFile);
+        config.set(Key.DEFAULT_DOOR_OPEN_SECONDS, this.defaultDoorOpenSeconds);
+        config.set(Key.UPDATER, this.updatePreference.toString());
+        config.set(Key.CONNECT_CONTAINERS, this.connectContainers);
+        config.set(Key.AUTO_EXPIRE_DAYS, this.autoExpireDays);
+        config.set(Key.ALLOW_DESTROY_BY, this.allowDestroyBy.stream().map(AttackType::toString).toList());
+        config.set(Key.PROTECTABLE_CONTAINERS, writeMaterialSet(protectableMaterialsMap.get(ProtectionType.CONTAINER)));
+        config.set(Key.PROTECTABLE_DOORS, writeMaterialSet(protectableMaterialsMap.get(ProtectionType.DOOR)));
+        config.set(Key.PROTECTABLE_ATTACHABLES, writeMaterialSet(protectableMaterialsMap.get(ProtectionType.ATTACHABLE)));
+    }
+
+    /**
+     * Writes a material set to a string list, suitable for the configuration.
+     * @param materials The materials.
+     * @return The material list. Will be empty if {@code materials} is null.
+     */
+    private List<String> writeMaterialSet(@Nullable Set<Material> materials) {
+        if (materials == null) {
+            return Collections.emptyList();
+        }
+        return materials.stream().map(mat -> mat.getKey().toString()).toList();
     }
 
     /**

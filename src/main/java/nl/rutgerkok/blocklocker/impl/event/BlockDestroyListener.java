@@ -234,7 +234,8 @@ public class BlockDestroyListener extends EventListener {
             }
 
             if (isProtected(blockState.getBlock())) {
-                it.remove();
+                event.setCancelled(true);
+                return;
             }
         }
     }
